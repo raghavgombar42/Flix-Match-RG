@@ -20,6 +20,9 @@ API keys.txt
 # Supabase CLI local cache (per-machine project link, not project source).
 supabase/.temp
 
+# Vercel CLI local cache (per-machine project link, not project source).
+.vercel
+
 # Editor
 .vscode/*
 !.vscode/extensions.json
