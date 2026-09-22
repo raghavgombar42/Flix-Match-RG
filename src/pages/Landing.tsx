@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Screen } from '../components/Screen'
@@ -11,6 +12,8 @@ const SHOWCASE = MOCK_TITLES.filter((t) => ['rrr', 'la-la-land', 'kantara', '3-i
 export default function Landing() {
   const navigate = useNavigate()
   const { startNewSession } = useSession()
+  const [showJoin, setShowJoin] = useState(false)
+  const [code, setCode] = useState('')
 
   return (
     <Screen showHistoryLink contentClassName="justify-center">
@@ -78,6 +81,41 @@ export default function Landing() {
             Start a session
           </Button>
           <p className="text-xs text-parchment-300/55">No account needed. Takes about a minute.</p>
+
+          {showJoin ? (
+            <form
+              className="flex w-full max-w-xs flex-col gap-2"
+              onSubmit={(e) => {
+                e.preventDefault()
+                const trimmed = code.trim()
+                if (trimmed) navigate(`/join/${trimmed.toUpperCase()}`)
+              }}
+            >
+              <label htmlFor="session-code" className="sr-only">
+                Session code
+              </label>
+              <input
+                id="session-code"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="Enter session code"
+                autoCapitalize="characters"
+                maxLength={8}
+                className="btn-focus min-h-[44px] w-full rounded-xl border border-ink-500 bg-ink-800/70 px-4 text-center font-mono text-sm uppercase tracking-[0.2em] text-parchment-100 placeholder:normal-case placeholder:tracking-normal placeholder:text-parchment-300/40 focus:border-ember-400/60"
+              />
+              <Button type="submit" variant="secondary" size="md" disabled={!code.trim()}>
+                Join session
+              </Button>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowJoin(true)}
+              className="btn-focus min-h-[44px] rounded-lg px-2 text-xs font-medium text-parchment-300/60 underline decoration-ink-500 underline-offset-4 transition-colors hover:text-ember-300"
+            >
+              Have a code? Join a session
+            </button>
+          )}
         </motion.div>
       </div>
     </Screen>

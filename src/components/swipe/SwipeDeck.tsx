@@ -7,6 +7,7 @@ interface SwipeDeckProps {
   onSwipe: (title: Title, direction: 'like' | 'pass') => void
 }
 
+/** How many cards render behind the top one for the stacked-paper look — NOT the total pool size (see `upcoming.length`, which reflects the full round of up to 30 titles). */
 const STACK_DEPTH = 3
 const EXIT_ANIMATION_MS = 260
 

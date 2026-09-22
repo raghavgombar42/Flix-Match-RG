@@ -42,4 +42,28 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Ambient, non-interactive backdrop glow used on wide screens so large viewports read as
+     an intentional cinematic space rather than a mobile card floating in empty void. */
+  .ambient-backdrop {
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+  }
+}
+
+/* Respect the OS-level reduced-motion preference globally: shorten/disable CSS animations and
+   transitions everywhere by default. Framer Motion elements opt out of their own motion
+   individually via useReducedMotion() where the effect is more than a fade (see SwipeCard). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

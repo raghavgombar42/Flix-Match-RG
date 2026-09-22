@@ -26,7 +26,7 @@ export function RatingStars({ value, onChange, size = 'md', readOnly = false }: 
             aria-checked={star === value}
             aria-label={`${star} star${star > 1 ? 's' : ''}`}
             onClick={() => onChange?.(star)}
-            className={`btn-focus rounded-full p-0.5 transition-transform hover:scale-110 ${filled ? 'text-ember-400' : 'text-ink-500 hover:text-ink-400'}`}
+            className={`btn-focus flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95 ${filled ? 'text-ember-400' : 'text-ink-500 hover:text-ink-400'}`}
           >
             <svg viewBox="0 0 24 24" className={dims} fill="currentColor" aria-hidden="true">
               <path d="M12 2.5l2.9 6.1 6.6.7-4.9 4.5 1.3 6.6L12 17l-5.9 3.4 1.3-6.6-4.9-4.5 6.6-.7z" />

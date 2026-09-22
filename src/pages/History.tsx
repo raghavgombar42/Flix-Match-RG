@@ -31,7 +31,7 @@ export default function History() {
   }
 
   return (
-    <Screen>
+    <Screen wide>
       <header className="mb-5 mt-2 flex items-center justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ember-400">Your history</p>
@@ -43,8 +43,8 @@ export default function History() {
       </header>
 
       {entries === null && (
-        <div className="flex flex-col items-center gap-3 py-16 text-center text-parchment-300/60">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-ink-600 border-t-ember-400" />
+        <div className="flex flex-col items-center gap-3 py-16 text-center text-parchment-300/60" role="status" aria-live="polite">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-ink-600 border-t-ember-400 motion-reduce:animate-none motion-reduce:border-t-ink-600" />
           <p className="text-sm">Loading history…</p>
         </div>
       )}
@@ -56,7 +56,7 @@ export default function History() {
         </div>
       )}
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
         {entries?.map((entry) => (
           <div key={entry.id} className="flex gap-4 rounded-2xl border border-ink-600 bg-ink-800/50 p-3">
             <div className="h-24 w-16 shrink-0 overflow-hidden rounded-lg">

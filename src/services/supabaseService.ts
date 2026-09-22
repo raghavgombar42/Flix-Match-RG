@@ -202,12 +202,15 @@ interface SessionActivityHandlers {
   onPreferenceInsert?: (partner: PartnerKey) => void
   onSwipeInsert?: (row: { partner: PartnerKey; round: number; titleId: string; direction: SwipeDirection }) => void
   onMatchInsert?: (row: { id: string; titleId: string; title: Title; round: number }) => void
+  /** Ephemeral presence, not persisted anywhere — just "is the other partner's tab open right now." */
+  onPresenceChange?: (otherPartnerOnline: boolean) => void
 }
 
-/** One realtime channel per session covering every table the other partner's device can change. */
-export function subscribeToSessionActivity(sessionId: string, handlers: SessionActivityHandlers): RealtimeChannel {
-  return supabase
-    .channel(`session:${sessionId}`)
+/** One realtime channel per session covering every table the other partner's device can change,
+ * plus lightweight presence tracking (who currently has this session open). */
+export function subscribeToSessionActivity(sessionId: string, myRole: PartnerKey | null, handlers: SessionActivityHandlers): RealtimeChannel {
+  const channel = supabase
+    .channel(`session:${sessionId}`, { config: { presence: { key: myRole ?? 'unknown' } } })
     .on(
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` },
@@ -234,7 +237,17 @@ export function subscribeToSessionActivity(sessionId: string, handlers: SessionA
         handlers.onMatchInsert?.({ id: row.id, titleId: row.title_id, title: row.title_snapshot, round: row.round })
       },
     )
-    .subscribe()
+    .on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState()
+      const otherOnline = Object.keys(state).some((key) => key !== (myRole ?? 'unknown') && state[key]?.length > 0)
+      handlers.onPresenceChange?.(otherOnline)
+    })
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED' && myRole) {
+        void channel.track({ role: myRole, online_at: new Date().toISOString() })
+      }
+    })
+  return channel
 }
 
 export function unsubscribeChannel(channel: RealtimeChannel | null | undefined): void {

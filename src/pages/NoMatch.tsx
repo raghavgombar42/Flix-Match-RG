@@ -25,7 +25,7 @@ export default function NoMatch() {
 
   return (
     <Screen contentClassName="justify-center">
-      <div className="flex flex-col items-center gap-5 py-8 text-center">
+      <div className="flex flex-col items-center gap-5 py-8 text-center lg:mx-auto lg:max-w-lg">
         <div className="flex h-20 w-20 items-center justify-center rounded-full border border-ink-500 bg-ink-800/70">
           <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" className="text-parchment-300/60" />
@@ -34,7 +34,7 @@ export default function NoMatch() {
         </div>
         <div>
           <h1 className="font-display text-2xl font-semibold text-parchment-100">No match this round</h1>
-          <p className="mx-auto mt-2 max-w-xs text-sm text-parchment-300/70">
+          <p className="mx-auto mt-2 max-w-xs text-sm text-parchment-300/70 lg:max-w-sm">
             {round === 1
               ? 'You both swiped through all 30 without a shared like. We’ll sharpen the picks based on what you each responded to.'
               : 'Still no overlap after round two. Let’s narrow it down to the five titles you both leaned toward, so you can pick together.'}

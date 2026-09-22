@@ -43,6 +43,8 @@ interface SessionState {
   isLoadingPool: boolean
   briefSummary: string | null
   joinError: string | null
+  /** Ephemeral realtime presence — is the other partner's tab currently open on this session. */
+  partnerOnline: boolean
 }
 
 function freshState(): SessionState {
@@ -69,6 +71,7 @@ function freshState(): SessionState {
     isLoadingPool: false,
     briefSummary: null,
     joinError: null,
+    partnerOnline: false,
   }
 }
 
@@ -84,6 +87,7 @@ type Action =
   | { type: 'SET_MATCH'; title: Title; round: 1 | 2 }
   | { type: 'SET_MATCH_DB_ID'; id: string }
   | { type: 'SET_TOP_FIVE'; titles: Title[] }
+  | { type: 'SET_PARTNER_ONLINE'; online: boolean }
   | { type: 'RESET' }
 
 function reducer(state: SessionState, action: Action): SessionState {
@@ -149,6 +153,8 @@ function reducer(state: SessionState, action: Action): SessionState {
       return { ...state, matchDbId: action.id }
     case 'SET_TOP_FIVE':
       return state.topFive ? state : { ...state, topFive: action.titles }
+    case 'SET_PARTNER_ONLINE':
+      return state.partnerOnline === action.online ? state : { ...state, partnerOnline: action.online }
     case 'RESET':
       return freshState()
     default:
@@ -243,7 +249,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const dbId = state.dbSessionId
     if (!dbId) return
-    const channel = subscribeToSessionActivity(dbId, {
+    const channel = subscribeToSessionActivity(dbId, state.role, {
+      onPresenceChange: (otherPartnerOnline) => dispatch({ type: 'SET_PARTNER_ONLINE', online: otherPartnerOnline }),
       onPreferenceInsert: (partner) => {
         const s = stateRef.current
         if (partner === s.role) return
@@ -276,7 +283,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       },
     })
     return () => unsubscribeChannel(channel)
-  }, [state.dbSessionId, applyRoundPool, attemptGeneratePool])
+  }, [state.dbSessionId, state.role, applyRoundPool, attemptGeneratePool])
 
   const submitHostPreferences = useCallback(
     (prefs: PartnerPreferences) => {
