@@ -38,13 +38,21 @@ export async function createSession(code: string): Promise<SessionRow | null> {
   return data as SessionRow
 }
 
+/** Looks up a session by its shareable code. The invite screen never shows a code
+ *  until its row is confirmed written (see Invite.tsx), but this retries once after
+ *  a short delay anyway — cheap insurance against any read landing a beat too early
+ *  (e.g. a partner who already had the join screen open and re-submits instantly). */
 export async function getSessionByCode(code: string): Promise<SessionRow | null> {
-  const { data, error } = await supabase.from('sessions').select('id, code, round, status, pool').eq('code', code).maybeSingle()
-  if (error || !data) {
-    if (error) logPersistenceFailure('getSessionByCode', error)
-    return null
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { data, error } = await supabase.from('sessions').select('id, code, round, status, pool').eq('code', code).maybeSingle()
+    if (error) {
+      logPersistenceFailure('getSessionByCode', error)
+      return null
+    }
+    if (data) return data as SessionRow
+    if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 600))
   }
-  return data as SessionRow
+  return null
 }
 
 export async function getSession(sessionId: string): Promise<SessionRow | null> {

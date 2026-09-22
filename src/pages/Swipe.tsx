@@ -32,7 +32,7 @@ export default function Swipe() {
 
   const upcoming = pool.slice(cursor)
 
-  if (isLoadingPool || pool.length === 0) {
+  if (isLoadingPool) {
     return (
       <Screen contentClassName="justify-center">
         <div className="flex flex-col items-center gap-4 py-10 text-center" role="status" aria-live="polite">
@@ -41,6 +41,27 @@ export default function Swipe() {
           <p className="max-w-xs text-sm text-parchment-300/65">
             Matching moods, languages, and ratings from both of your profiles. Up to 30 titles, picked just for
             tonight.
+          </p>
+        </div>
+      </Screen>
+    )
+  }
+
+  // Only reachable if live title fetching genuinely came back empty (e.g. TMDB
+  // unreachable) — a distinct, honest error state rather than a spinner that
+  // never resolves.
+  if (pool.length === 0) {
+    return (
+      <Screen contentClassName="justify-center">
+        <div className="flex flex-col items-center gap-4 py-10 text-center" role="alert">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-400">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 8v5M12 16h.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <h1 className="font-display text-xl font-semibold text-parchment-100">Couldn&apos;t load titles</h1>
+          <p className="max-w-xs text-sm text-parchment-300/70">
+            We couldn&apos;t reach our title database just now. Please try again in a moment.
           </p>
         </div>
       </Screen>

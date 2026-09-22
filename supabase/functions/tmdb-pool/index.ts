@@ -153,14 +153,22 @@ interface RawResult {
   genre_ids?: number[]
 }
 
-async function discover(type: 'movie' | 'tv', langCode: string | null, minRating: number, apiToken: string): Promise<RawResult[]> {
+async function discover(
+  type: 'movie' | 'tv',
+  langCode: string | null,
+  minRating: number,
+  apiToken: string,
+  pageCount = 2,
+  minVoteCount = 50,
+): Promise<RawResult[]> {
   const out: RawResult[] = []
-  for (const page of [1, 2]) {
+  const pages = Array.from({ length: pageCount }, (_, i) => i + 1)
+  for (const page of pages) {
     const params = new URLSearchParams({
       sort_by: 'popularity.desc',
       include_adult: 'false',
       'vote_average.gte': String(minRating),
-      'vote_count.gte': '50',
+      'vote_count.gte': String(minVoteCount),
       page: String(page),
     })
     if (langCode) params.set('with_original_language', langCode)
@@ -209,20 +217,16 @@ Deno.serve(async (req) => {
 
     const bothWantSeries = prefsA.contentType === 'series' && prefsB.contentType === 'series'
     const types: Array<'movie' | 'tv'> = bothWantSeries ? ['movie', 'tv'] : ['movie']
-    const minRating = Math.max(prefsA.minRating, prefsB.minRating)
-    const languages = effectiveLanguages(prefsA, prefsB)
-    const eras = effectiveEras(prefsA, prefsB)
+    const requestedMinRating = Math.max(prefsA.minRating, prefsB.minRating)
+    const requestedLanguages = effectiveLanguages(prefsA, prefsB)
+    const requestedEras = effectiveEras(prefsA, prefsB)
     const wantedMoods = new Set<Mood>([...prefsA.moods, ...prefsB.moods])
-    const langCodes = (languages && languages.length > 0 ? languages : (Object.keys(LANGUAGE_CODES) as LanguageName[])).map((l) => LANGUAGE_CODES[l])
-
-    const fetches: Promise<RawResult[]>[] = []
-    for (const type of types) {
-      for (const code of langCodes) fetches.push(discover(type, code, minRating, apiToken))
-    }
-    const raw = (await Promise.all(fetches)).flat()
+    const allLanguages = Object.keys(LANGUAGE_CODES) as LanguageName[]
+    const requestedLangCodes = (requestedLanguages && requestedLanguages.length > 0 ? requestedLanguages : allLanguages).map((l) => LANGUAGE_CODES[l])
+    const allLangCodes = allLanguages.map((l) => LANGUAGE_CODES[l])
 
     const excluded = new Set(excludeIds)
-    const seen = new Set<string>()
+
     interface Candidate {
       id: string
       type: 'movie' | 'tv'
@@ -234,31 +238,91 @@ Deno.serve(async (req) => {
       language: LanguageName
       raw: RawResult
     }
-    const candidates: Candidate[] = []
 
-    for (const r of raw) {
-      const id = `tmdb-${r.__type}-${r.id}`
-      if (seen.has(id) || excluded.has(id)) continue
-      const releaseDate = r.__type === 'movie' ? r.release_date : r.first_air_date
-      if (!releaseDate || releaseDate.length < 4) continue
-      const year = Number(releaseDate.slice(0, 4))
-      if (!year) continue
-      const era = eraFor(year)
-      if (eras && !eras.has(era)) continue
-      const name = r.__type === 'movie' ? r.title : r.name
-      if (!name) continue
-      const genreMap = r.__type === 'movie' ? MOVIE_GENRES : TV_GENRES
-      const genres = (r.genre_ids ?? []).map((g) => genreMap[g]).filter((g): g is string => Boolean(g))
-      const language = CODE_TO_LANGUAGE[r.original_language ?? ''] ?? 'English'
-      seen.add(id)
-      candidates.push({ id, type: r.__type, tmdbId: r.id, name, year, era, genres, language, raw: r })
+    function toCandidates(rawResults: RawResult[], eraFilter: Set<Era> | null): Candidate[] {
+      const seen = new Set<string>()
+      const out: Candidate[] = []
+      // TMDB occasionally catalogues the same real film under two different ids (a
+      // data-quality quirk, not something callers control) — id-based dedup alone
+      // lets both through, so a `name|year` key is tracked as a second dedup guard.
+      const seenNameYear = new Set<string>()
+      for (const r of rawResults) {
+        const id = `tmdb-${r.__type}-${r.id}`
+        if (seen.has(id) || excluded.has(id)) continue
+        const releaseDate = r.__type === 'movie' ? r.release_date : r.first_air_date
+        if (!releaseDate || releaseDate.length < 4) continue
+        const year = Number(releaseDate.slice(0, 4))
+        if (!year) continue
+        const era = eraFor(year)
+        if (eraFilter && !eraFilter.has(era)) continue
+        const name = r.__type === 'movie' ? r.title : r.name
+        if (!name) continue
+        const nameYearKey = `${name.trim().toLowerCase()}|${year}`
+        if (seenNameYear.has(nameYearKey)) continue
+        const genreMap = r.__type === 'movie' ? MOVIE_GENRES : TV_GENRES
+        const genres = (r.genre_ids ?? []).map((g) => genreMap[g]).filter((g): g is string => Boolean(g))
+        const language = CODE_TO_LANGUAGE[r.original_language ?? ''] ?? 'English'
+        seen.add(id)
+        seenNameYear.add(nameYearKey)
+        out.push({ id, type: r.__type, tmdbId: r.id, name, year, era, genres, language, raw: r })
+      }
+      out.sort((a, b) => {
+        const scoreDiff = moodScore(b.genres, wantedMoods) - moodScore(a.genres, wantedMoods)
+        if (scoreDiff !== 0) return scoreDiff
+        return (b.raw.vote_average ?? 0) - (a.raw.vote_average ?? 0)
+      })
+      return out
     }
 
-    candidates.sort((a, b) => {
-      const scoreDiff = moodScore(b.genres, wantedMoods) - moodScore(a.genres, wantedMoods)
-      if (scoreDiff !== 0) return scoreDiff
-      return (b.raw.vote_average ?? 0) - (a.raw.vote_average ?? 0)
-    })
+    async function fetchRaw(langCodes: string[], minRating: number, pageCount = 2, minVoteCount = 50): Promise<RawResult[]> {
+      const fetches: Promise<RawResult[]>[] = []
+      for (const type of types) {
+        for (const code of langCodes) fetches.push(discover(type, code, minRating, apiToken, pageCount, minVoteCount))
+      }
+      return (await Promise.all(fetches)).flat()
+    }
+
+    // Progressive relaxation, in this documented order — each stage only runs if the
+    // previous one still leaves us short of `poolSize` eligible titles. Two people's
+    // combined filters (specific language + specific era + a high rating floor) can
+    // easily intersect down to a handful of real TMDB matches; we'd rather loosen the
+    // least-visible constraints first than show a narrow round of real titles. Content
+    // type ("movies only" vs "include series") is never relaxed — that's an explicit
+    // product choice, not a taste filter. Production never falls back to placeholder
+    // data (see tmdbService.ts / poolPadding.ts), so this function tries hard before
+    // conceding a smaller-than-requested pool.
+    //   1. Exact: requested languages ∩, requested eras ∩, minRating = max(A, B)
+    //   2. Drop the era filter (reuse the same fetch — era isn't a TMDB query param)
+    //   3. Lower the rating floor by 3 (re-fetch: vote_average.gte is a TMDB param)
+    //   4. Broaden to every supported language, at that same lowered rating
+    //   5. Last resort: rating floor 0, vote-count floor dropped from 50 to 5, every
+    //      language, more pages per query — casts the widest net TMDB allows
+    let raw = await fetchRaw(requestedLangCodes, requestedMinRating)
+    let candidates = toCandidates(raw, requestedEras)
+
+    if (candidates.length < poolSize && requestedEras) {
+      candidates = toCandidates(raw, null)
+    }
+
+    if (candidates.length < poolSize && requestedMinRating > 0) {
+      const relaxedRating = Math.max(0, requestedMinRating - 3)
+      const relaxedRaw = await fetchRaw(requestedLangCodes, relaxedRating)
+      raw = [...raw, ...relaxedRaw]
+      candidates = toCandidates(raw, null)
+    }
+
+    if (candidates.length < poolSize && requestedLangCodes.length < allLangCodes.length) {
+      const relaxedRating = Math.max(0, requestedMinRating - 3)
+      const broadRaw = await fetchRaw(allLangCodes, relaxedRating)
+      raw = [...raw, ...broadRaw]
+      candidates = toCandidates(raw, null)
+    }
+
+    if (candidates.length < poolSize) {
+      const widestRaw = await fetchRaw(allLangCodes, 0, 4, 5)
+      raw = [...raw, ...widestRaw]
+      candidates = toCandidates(raw, null)
+    }
 
     const top = candidates.slice(0, poolSize)
     const details = await Promise.all(top.map((c) => fetchDetail(c.type, c.tmdbId, apiToken)))

@@ -6,7 +6,7 @@ import { useSession } from '../state/SessionContext'
 
 export default function NoMatch() {
   const navigate = useNavigate()
-  const { round, topFive, finishRoundWithNoMatch } = useSession()
+  const { round, pool, topFive, finishRoundWithNoMatch } = useSession()
   const [loading, setLoading] = useState(false)
   const roundOnEntry = useRef(round).current
 
@@ -36,7 +36,7 @@ export default function NoMatch() {
           <h1 className="font-display text-2xl font-semibold text-parchment-100">No match this round</h1>
           <p className="mx-auto mt-2 max-w-xs text-sm text-parchment-300/70 lg:max-w-sm">
             {round === 1
-              ? 'You both swiped through all 30 without a shared like. We’ll sharpen the picks based on what you each responded to.'
+              ? `You both swiped through all ${pool.length} without a shared like. We’ll sharpen the picks based on what you each responded to.`
               : 'Still no overlap after round two. Let’s narrow it down to the five titles you both leaned toward, so you can pick together.'}
           </p>
         </div>

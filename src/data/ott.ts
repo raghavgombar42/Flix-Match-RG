@@ -1,4 +1,4 @@
-import type { Language, OttListing } from '../types'
+import type { Language, OttListing } from '../types.ts'
 
 /**
  * Mock Indian OTT platform catalogue. Real availability will come from the

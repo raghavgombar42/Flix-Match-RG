@@ -1,5 +1,5 @@
-import type { Title } from '../types'
-import { mockOttAvailability } from './ott'
+import type { Title } from '../types.ts'
+import { mockOttAvailability } from './ott.ts'
 
 /**
  * Local mock title catalogue standing in for a TMDB fetch — see

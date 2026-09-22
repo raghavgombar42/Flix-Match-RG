@@ -57,7 +57,7 @@ function MilestoneRow({ milestone, isLast }: { milestone: Milestone; isLast: boo
 
 export default function Invite() {
   const navigate = useNavigate()
-  const { inviteLink, sessionId, prefsA, prefsB, pool, isLoadingPool, partnerOnline } = useSession()
+  const { inviteLink, sessionId, dbSessionId, prefsA, prefsB, pool, isLoadingPool, partnerOnline } = useSession()
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
 
   useEffect(() => {
@@ -69,6 +69,22 @@ export default function Invite() {
   useEffect(() => {
     if (pool.length > 0) navigate('/swipe')
   }, [pool.length, navigate])
+
+  // submitHostPreferences kicks off createSession() without waiting for it, so the
+  // page can render instantly — but the invite link/QR/code embed sessionId, which
+  // is only real once that insert lands in the database. Sharing (or scanning) it
+  // before then would send a partner to a session that doesn't exist yet, so hold
+  // the invite screen on a loading state until dbSessionId is confirmed.
+  if (prefsA && !dbSessionId) {
+    return (
+      <Screen contentClassName="justify-center">
+        <div className="flex flex-col items-center gap-4 py-10 text-center" role="status" aria-live="polite">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-ink-600 border-t-ember-400 motion-reduce:animate-none motion-reduce:border-t-ink-600" />
+          <p className="font-display text-lg text-parchment-100">Preparing your invite…</p>
+        </div>
+      </Screen>
+    )
+  }
 
   async function handleCopy() {
     try {
