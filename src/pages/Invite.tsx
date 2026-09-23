@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button'
 import { StepIndicator } from '../components/ui/StepIndicator'
 import { PicksSummary } from '../components/ui/PicksSummary'
 import { useSession } from '../state/SessionContext'
+import { moodAmbienceFrom } from '../lib/moodAmbience'
 
 type MilestoneStatus = 'done' | 'active' | 'pending'
 interface Milestone {
@@ -26,7 +27,7 @@ function MilestoneRow({ milestone, isLast }: { milestone: Milestone; isLast: boo
             status === 'done'
               ? 'border-sage-400 bg-sage-500/20 text-sage-300'
               : status === 'active'
-                ? 'border-ember-400 bg-ember-500/15 text-ember-300'
+                ? 'border-violet-400 bg-violet-500/15 text-violet-300'
                 : 'border-ink-600 bg-ink-800/60 text-parchment-300/40'
           }`}
         >
@@ -36,8 +37,8 @@ function MilestoneRow({ milestone, isLast }: { milestone: Milestone; isLast: boo
             </motion.svg>
           ) : status === 'active' ? (
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-pulse-ring rounded-full bg-ember-400 motion-reduce:hidden" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-ember-400" />
+              <span className="absolute inline-flex h-full w-full animate-pulse-ring rounded-full bg-violet-400 motion-reduce:hidden" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-violet-400" />
             </span>
           ) : (
             <span className="h-1.5 w-1.5 rounded-full bg-parchment-300/30" />
@@ -59,6 +60,7 @@ export default function Invite() {
   const navigate = useNavigate()
   const { inviteLink, sessionId, dbSessionId, prefsA, prefsB, pool, isLoadingPool, partnerOnline } = useSession()
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
+  const ambience = moodAmbienceFrom(prefsA, prefsB)
 
   useEffect(() => {
     if (!prefsA) {
@@ -77,7 +79,7 @@ export default function Invite() {
   // the invite screen on a loading state until dbSessionId is confirmed.
   if (prefsA && !dbSessionId) {
     return (
-      <Screen contentClassName="justify-center">
+      <Screen contentClassName="justify-center" ambience={ambience}>
         <div className="flex flex-col items-center gap-4 py-10 text-center" role="status" aria-live="polite">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-ink-600 border-t-ember-400 motion-reduce:animate-none motion-reduce:border-t-ink-600" />
           <p className="font-display text-lg text-parchment-100">Preparing your invite…</p>
@@ -143,6 +145,7 @@ export default function Invite() {
   return (
     <Screen
       wide
+      ambience={ambience}
       side={
         prefsA ? (
           <div className="flex flex-col gap-5">

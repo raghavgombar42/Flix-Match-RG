@@ -5,10 +5,12 @@ import { SwipeDeck } from '../components/swipe/SwipeDeck'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { PosterImage } from '../components/ui/PosterImage'
 import { useSession } from '../state/SessionContext'
+import { moodAmbienceFrom } from '../lib/moodAmbience'
 
 export default function Swipe() {
   const navigate = useNavigate()
-  const { pool, cursor, progress, round, isLoadingPool, match, swipe, dbSessionId, partnerFinishedRound } = useSession()
+  const { pool, cursor, progress, isLoadingPool, match, swipe, dbSessionId, partnerFinishedRound, iAmDone, prefsA, prefsB } = useSession()
+  const ambience = moodAmbienceFrom(prefsA, prefsB)
 
   useEffect(() => {
     if (!dbSessionId) {
@@ -22,11 +24,11 @@ export default function Swipe() {
     }
   }, [match, navigate])
 
-  const iAmDone = pool.length > 0 && cursor >= pool.length
-
+  // Both partners always swipe through the full pool — a mutual like never
+  // interrupts this. Only once both are done does the shared reveal happen.
   useEffect(() => {
     if (!isLoadingPool && iAmDone && partnerFinishedRound && !match) {
-      navigate('/no-match')
+      navigate('/overlap')
     }
   }, [iAmDone, partnerFinishedRound, isLoadingPool, match, navigate])
 
@@ -34,7 +36,7 @@ export default function Swipe() {
 
   if (isLoadingPool) {
     return (
-      <Screen contentClassName="justify-center">
+      <Screen contentClassName="justify-center" ambience={ambience}>
         <div className="flex flex-col items-center gap-4 py-10 text-center" role="status" aria-live="polite">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-ink-600 border-t-ember-400 motion-reduce:animate-none motion-reduce:border-t-ink-600" />
           <p className="font-display text-lg text-parchment-100">Finding titles you&apos;ll both like…</p>
@@ -52,7 +54,7 @@ export default function Swipe() {
   // never resolves.
   if (pool.length === 0) {
     return (
-      <Screen contentClassName="justify-center">
+      <Screen contentClassName="justify-center" ambience={ambience}>
         <div className="flex flex-col items-center gap-4 py-10 text-center" role="alert">
           <div className="flex h-16 w-16 items-center justify-center rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-400">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -70,17 +72,19 @@ export default function Swipe() {
 
   if (iAmDone && !partnerFinishedRound) {
     return (
-      <Screen contentClassName="justify-center">
-        <div className="flex flex-col items-center gap-4 py-10 text-center" role="status" aria-live="polite">
-          <span className="relative flex h-3 w-3">
-            <span className="absolute inline-flex h-full w-full animate-pulse-ring rounded-full bg-ember-400 motion-reduce:hidden" />
-            <span className="relative inline-flex h-3 w-3 rounded-full bg-ember-400" />
+      <Screen contentClassName="justify-center" ambience={ambience}>
+        <div className="flex flex-col items-center gap-5 py-10 text-center" role="status" aria-live="polite">
+          <span className="relative flex h-4 w-4">
+            <span className="absolute inline-flex h-full w-full animate-pulse-ring rounded-full bg-violet-400 motion-reduce:hidden" />
+            <span className="relative inline-flex h-4 w-4 rounded-full bg-violet-400" />
           </span>
-          <p className="font-display text-lg text-parchment-100">Waiting for your partner to finish…</p>
-          <p className="max-w-xs text-sm text-parchment-300/65">
-            You&apos;ve swiped through all {pool.length}. We&apos;ll reveal a match the moment you both like the same
-            one.
-          </p>
+          <div>
+            <p className="font-display text-xl text-parchment-100">Waiting for your partner to finish…</p>
+            <p className="mx-auto mt-2 max-w-xs text-sm text-parchment-300/65">
+              You&apos;ve swiped through all {pool.length}. The Overlap reveals itself the moment you&apos;re both
+              done — no spoilers before then.
+            </p>
+          </div>
         </div>
       </Screen>
     )
@@ -92,6 +96,7 @@ export default function Swipe() {
     <Screen
       wide
       contentClassName="justify-start"
+      ambience={ambience}
       side={
         <div className="flex flex-col gap-5">
           <div>
@@ -121,11 +126,7 @@ export default function Swipe() {
       }
     >
       <div className="mb-5 mt-1 flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ember-400">
-            {round === 1 ? 'Round 1' : 'Round 2 · Refined for you'}
-          </p>
-        </div>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-400">Swipe through all 30</p>
         <ProgressBar current={progress.current} total={progress.total} label="Swiping" />
       </div>
 

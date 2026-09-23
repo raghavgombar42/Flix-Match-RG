@@ -7,11 +7,13 @@ import { PosterImage } from '../components/ui/PosterImage'
 import { OttBadge } from '../components/ui/OttBadge'
 import { RatingStars } from '../components/ui/RatingStars'
 import { useSession } from '../state/SessionContext'
+import { moodAmbienceFrom } from '../lib/moodAmbience'
 
 export default function Match() {
   const navigate = useNavigate()
-  const { match, rateActiveMatch, startNewSession } = useSession()
+  const { match, rateActiveMatch, startNewSession, prefsA, prefsB } = useSession()
   const prefersReducedMotion = useReducedMotion()
+  const ambience = moodAmbienceFrom(prefsA, prefsB)
   const [rating, setRating] = useState(0)
   const [saved, setSaved] = useState(false)
 
@@ -67,7 +69,7 @@ export default function Match() {
             navigate('/preferences/a')
           }}
         >
-          Find another match
+          Start a new session
         </Button>
         <Button variant="ghost" onClick={() => navigate('/history')}>
           View history
@@ -77,23 +79,23 @@ export default function Match() {
   )
 
   return (
-    <Screen wide contentClassName="justify-start" side={sidePanel}>
+    <Screen wide contentClassName="justify-start" side={sidePanel} ambience={ambience}>
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         className="mb-5 mt-3 flex flex-col items-center gap-1 text-center lg:items-start lg:text-left"
       >
-        <span className="bg-gradient-to-r from-ember-400 via-rose-400 to-ember-400 bg-clip-text font-display text-3xl font-bold text-transparent">
-          It&apos;s a match!
+        <span className="bg-gradient-to-r from-violet-400 via-rose-400 to-ember-400 bg-clip-text font-display text-3xl font-bold text-transparent">
+          Tonight&apos;s Pick is locked in
         </span>
-        <p className="text-sm text-parchment-300/75">You both liked this one.</p>
+        <p className="text-sm text-parchment-300/75">Enjoy your movie night, together.</p>
       </motion.div>
 
       <motion.div
         initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.92, y: prefersReducedMotion ? 0 : 24 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 220, damping: 20, delay: prefersReducedMotion ? 0 : 0.1 }}
-        className="overflow-hidden rounded-[28px] border border-ember-400/30 bg-ink-800 shadow-glow lg:flex lg:flex-row"
+        className="overflow-hidden rounded-[28px] border border-violet-400/30 bg-ink-800 shadow-glow-violet lg:flex lg:flex-row"
       >
         <div className="relative h-72 w-full shrink-0 lg:h-auto lg:w-72">
           <PosterImage seed={title.posterSeed} url={title.posterUrl} title={title.name} className="h-full w-full" priority />

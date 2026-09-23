@@ -4,9 +4,8 @@ import PreferencesA from './pages/PreferencesA'
 import Invite from './pages/Invite'
 import JoinSession from './pages/JoinSession'
 import Swipe from './pages/Swipe'
+import Overlap from './pages/Overlap'
 import Match from './pages/Match'
-import NoMatch from './pages/NoMatch'
-import TopFive from './pages/TopFive'
 import History from './pages/History'
 
 export default function App() {
@@ -17,8 +16,7 @@ export default function App() {
       <Route path="/invite" element={<Invite />} />
       <Route path="/join/:code" element={<JoinSession />} />
       <Route path="/swipe" element={<Swipe />} />
-      <Route path="/no-match" element={<NoMatch />} />
-      <Route path="/top-five" element={<TopFive />} />
+      <Route path="/overlap" element={<Overlap />} />
       <Route path="/match" element={<Match />} />
       <Route path="/history" element={<History />} />
       <Route path="*" element={<Landing />} />

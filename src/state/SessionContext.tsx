@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useReducer, useRef, type ReactNode } from 'react'
-import { generateSearchBrief, refinePoolForRoundTwo } from '../services/aiService'
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react'
+import { generateSearchBrief } from '../services/aiService'
 import { fetchTitlePool, shuffleForPartner } from '../services/tmdbService'
+import { rankOverlap, type RankedOverlapTitle } from '../services/overlapRanking.ts'
 import {
   claimSessionTransition,
   createSession,
@@ -39,7 +40,6 @@ interface SessionState {
   allPartnerLikes: Title[]
   match: { title: Title; round: 1 | 2 } | null
   matchDbId: string | null
-  topFive: Title[] | null
   isLoadingPool: boolean
   briefSummary: string | null
   joinError: string | null
@@ -67,7 +67,6 @@ function freshState(): SessionState {
     allPartnerLikes: [],
     match: null,
     matchDbId: null,
-    topFive: null,
     isLoadingPool: false,
     briefSummary: null,
     joinError: null,
@@ -84,9 +83,9 @@ type Action =
   | { type: 'SET_ROUND_POOL'; pool: Title[]; round: 1 | 2; briefSummary: string }
   | { type: 'SWIPE'; title: Title; direction: SwipeDirection }
   | { type: 'PARTNER_SWIPE'; titleId: string; direction: SwipeDirection; title?: Title }
+  | { type: 'HYDRATE_OWN_SWIPES'; likedTitles: Title[]; cursor: number }
   | { type: 'SET_MATCH'; title: Title; round: 1 | 2 }
   | { type: 'SET_MATCH_DB_ID'; id: string }
-  | { type: 'SET_TOP_FIVE'; titles: Title[] }
   | { type: 'SET_PARTNER_ONLINE'; online: boolean }
   | { type: 'RESET' }
 
@@ -124,7 +123,6 @@ function reducer(state: SessionState, action: Action): SessionState {
         briefSummary: action.briefSummary,
         match: null,
         matchDbId: null,
-        topFive: null,
       }
     case 'SWIPE': {
       const nextCursor = state.cursor + 1
@@ -133,6 +131,8 @@ function reducer(state: SessionState, action: Action): SessionState {
       yourLikeIds.add(action.title.id)
       return { ...state, cursor: nextCursor, yourLikeIds, allYourLikes: [...state.allYourLikes, action.title] }
     }
+    case 'HYDRATE_OWN_SWIPES':
+      return { ...state, cursor: action.cursor, yourLikeIds: new Set(action.likedTitles.map((t) => t.id)), allYourLikes: action.likedTitles }
     case 'PARTNER_SWIPE': {
       const partnerSwipedIds = new Set(state.partnerSwipedIds)
       partnerSwipedIds.add(action.titleId)
@@ -151,8 +151,6 @@ function reducer(state: SessionState, action: Action): SessionState {
       return state.match ? state : { ...state, match: { title: action.title, round: action.round } }
     case 'SET_MATCH_DB_ID':
       return { ...state, matchDbId: action.id }
-    case 'SET_TOP_FIVE':
-      return state.topFive ? state : { ...state, topFive: action.titles }
     case 'SET_PARTNER_ONLINE':
       return state.partnerOnline === action.online ? state : { ...state, partnerOnline: action.online }
     case 'RESET':
@@ -170,7 +168,9 @@ interface SessionContextValue extends SessionState {
   currentCard: Title | null
   progress: { current: number; total: number }
   partnerFinishedRound: boolean
-  finishRoundWithNoMatch: () => Promise<'round-two' | 'top-five'>
+  iAmDone: boolean
+  /** All titles both partners liked, ranked — empty until both finish swiping. */
+  overlapTitles: RankedOverlapTitle[]
   pickFinalTitle: (title: Title) => Promise<void>
   rateActiveMatch: (rating: number) => Promise<void>
   startNewSession: () => void
@@ -191,7 +191,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const myRole = stateRef.current.role
     if (!dbId) return
     const byId = new Map(pool.map((t) => [t.id, t]))
+    // Rehydrate both sides of the swipe history from the database — not just the
+    // partner's — so a reload mid-round (or joining a round already in progress)
+    // resumes at the right card instead of silently rewinding to the start.
     void getSwipesForRound(dbId, round).then((rows) => {
+      const mine = rows.filter((r) => r.partner === myRole)
+      if (mine.length > 0) {
+        const likedTitles = mine
+          .filter((r) => r.direction === 'like')
+          .map((r) => byId.get(r.titleId))
+          .filter((t): t is Title => Boolean(t))
+        dispatch({ type: 'HYDRATE_OWN_SWIPES', likedTitles, cursor: mine.length })
+      }
       rows
         .filter((r) => r.partner !== myRole)
         .forEach((r) => dispatch({ type: 'PARTNER_SWIPE', titleId: r.titleId, direction: r.direction, title: byId.get(r.titleId) }))
@@ -213,38 +224,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // If we lost the race, the realtime session-update handler picks up the winner's pool.
   }, [applyRoundPool])
 
-  const attemptAdvanceRound = useCallback(async () => {
-    const s = stateRef.current
-    if (!s.dbSessionId || !s.prefsA || !s.prefsB) return
-    if (s.round === 1) {
-      const brief = await refinePoolForRoundTwo([...s.allYourLikes, ...s.allPartnerLikes])
-      const pool = await fetchTitlePool({ prefsA: s.prefsA, prefsB: s.prefsB, excludeIds: s.seenIds, seed: Date.now() })
-      const claimed = await claimSessionTransition(
-        s.dbSessionId,
-        { round: 1, status: 'swiping' },
-        { round: 2, status: 'swiping', pool },
-      )
-      if (claimed) applyRoundPool(pool, 2, brief.summary)
-    } else {
-      const combined = new Map<string, { title: Title; score: number }>()
-      ;[...s.allYourLikes, ...s.allPartnerLikes].forEach((title) => {
-        const existing = combined.get(title.id)
-        combined.set(title.id, { title, score: (existing?.score ?? 0) + 1 })
-      })
-      const top = Array.from(combined.values())
-        .sort((a, b) => b.score - a.score || b.title.imdbRating - a.title.imdbRating)
-        .slice(0, 5)
-        .map((entry) => entry.title)
-      const fallback = top.length > 0 ? top : shuffleForPartner(s.pool, Date.now()).slice(0, 5)
-      const claimed = await claimSessionTransition(
-        s.dbSessionId,
-        { round: 2, status: 'swiping' },
-        { round: 2, status: 'top_five', pool: fallback },
-      )
-      if (claimed) dispatch({ type: 'SET_TOP_FIVE', titles: fallback })
-    }
-  }, [applyRoundPool])
-
   // One realtime channel per DB session, covering every table the other partner's device can change.
   useEffect(() => {
     const dbId = state.dbSessionId
@@ -263,10 +242,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const s = stateRef.current
         if (partner === s.role || round !== s.round) return
         const title = s.pool.find((t) => t.id === titleId)
+        // Bookkeeping only — no match-insert here. Mutual likes are stored (via
+        // saveSwipe, already fired) the instant either partner swipes, but they no
+        // longer interrupt swiping; the overlap is computed once both are done.
         dispatch({ type: 'PARTNER_SWIPE', titleId, direction, title })
-        if (direction === 'like' && title && s.yourLikeIds.has(titleId)) {
-          void tryInsertMatch(dbId, title, s.round)
-        }
       },
       onMatchInsert: ({ id, title, round }) => {
         dispatch({ type: 'SET_MATCH', title, round: round as 1 | 2 })
@@ -274,11 +253,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       },
       onSessionUpdate: (row) => {
         const s = stateRef.current
-        if (row.status === 'swiping' && (row.round > s.round || (row.round === s.round && s.pool.length === 0))) {
-          const titles = shuffleForPartner(row.pool, Date.now())
-          applyRoundPool(titles, row.round as 1 | 2, 'Refined for both of you.')
-        } else if (row.status === 'top_five' && !s.topFive) {
-          dispatch({ type: 'SET_TOP_FIVE', titles: shuffleForPartner(row.pool, Date.now()) })
+        if (row.status === 'swiping' && row.round === s.round && s.pool.length === 0) {
+          // We lost the initial pool-generation race — pick up the winner's pool.
+          applyRoundPool(shuffleForPartner(row.pool, Date.now()), row.round as 1 | 2, 'Matching moods, languages, and ratings from both of your profiles.')
         }
       },
     })
@@ -308,8 +285,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (prefsA) dispatch({ type: 'SET_PREFS', partner: 'A', prefs: prefsA })
     if (row.status === 'swiping' && row.pool.length > 0) {
       applyRoundPool(shuffleForPartner(row.pool, Date.now()), row.round as 1 | 2, 'Matching moods, languages, and ratings from both of your profiles.')
-    } else if (row.status === 'top_five' && row.pool.length > 0) {
-      dispatch({ type: 'SET_TOP_FIVE', titles: shuffleForPartner(row.pool, Date.now()) })
     }
   }, [applyRoundPool])
 
@@ -328,17 +303,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SWIPE', title, direction })
     const s = stateRef.current
     if (!s.dbSessionId) return
+    // Stored immediately (every swipe, not just likes) so the overlap is always
+    // derivable from the database — but deliberately no match-detection here.
+    // Swiping must never be interrupted; see overlapTitles below for how mutual
+    // likes surface once both partners are done.
     void saveSwipe(s.dbSessionId, s.role ?? 'A', s.round, title.id, direction)
-    if (direction === 'like' && s.partnerLikeIds.has(title.id)) {
-      void tryInsertMatch(s.dbSessionId, title, s.round)
-    }
   }, [])
-
-  const finishRoundWithNoMatch = useCallback(async (): Promise<'round-two' | 'top-five'> => {
-    const outcome = stateRef.current.round === 1 ? 'round-two' : 'top-five'
-    await attemptAdvanceRound()
-    return outcome
-  }, [attemptAdvanceRound])
 
   const pickFinalTitle = useCallback(async (title: Title) => {
     const s = stateRef.current
@@ -361,6 +331,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const currentCard = state.pool[state.cursor] ?? null
   const progress = { current: Math.min(state.cursor + 1, state.pool.length), total: state.pool.length }
   const partnerFinishedRound = state.pool.length > 0 && state.partnerSwipedIds.size >= state.pool.length
+  const iAmDone = state.pool.length > 0 && state.cursor >= state.pool.length
+
+  // The overlap only makes sense once both partners have actually finished — while
+  // either is still swiping, "mutual likes so far" would be a moving, misleading
+  // target (and would leak who's ahead). Empty otherwise, computed fresh each time
+  // either side's like set changes.
+  const overlapTitles = useMemo(() => {
+    if (!(iAmDone && partnerFinishedRound) || !state.prefsA || !state.prefsB) return []
+    const mutual = state.pool.filter((t) => state.yourLikeIds.has(t.id) && state.partnerLikeIds.has(t.id))
+    return rankOverlap(mutual, state.prefsA, state.prefsB)
+  }, [iAmDone, partnerFinishedRound, state.pool, state.yourLikeIds, state.partnerLikeIds, state.prefsA, state.prefsB])
 
   const value: SessionContextValue = {
     ...state,
@@ -371,7 +352,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     currentCard,
     progress,
     partnerFinishedRound,
-    finishRoundWithNoMatch,
+    iAmDone,
+    overlapTitles,
     pickFinalTitle,
     rateActiveMatch,
     startNewSession,

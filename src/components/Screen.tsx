@@ -1,6 +1,18 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
+/** Subtle per-mood ambient tinting — same layout, different light, so a romantic session
+ *  doesn't feel like a scary one. Falls back to the default violet/coral pairing. */
+export type MoodAmbience = 'romantic' | 'scary' | 'light' | 'intense' | undefined
+
+const AMBIENCE_BLOBS: Record<'default' | Exclude<MoodAmbience, undefined>, [string, string]> = {
+  default: ['bg-violet-600/15', 'bg-rose-600/10'],
+  romantic: ['bg-rose-600/15', 'bg-violet-600/12'],
+  scary: ['bg-violet-700/20', 'bg-electric-600/8'],
+  light: ['bg-ember-500/15', 'bg-rose-500/10'],
+  intense: ['bg-electric-600/15', 'bg-violet-600/12'],
+}
+
 interface ScreenProps {
   children: ReactNode
   contentClassName?: string
@@ -9,6 +21,8 @@ interface ScreenProps {
   wide?: boolean
   /** Desktop-only side panel (e.g. a live picks summary or session status) — hidden below lg. */
   side?: ReactNode
+  /** Tints the ambient backdrop glow toward the session's dominant mood. */
+  ambience?: MoodAmbience
 }
 
 /**
@@ -17,13 +31,14 @@ interface ScreenProps {
  * instead of the same mobile card just floating in a wider void — see README's "Responsive
  * strategy" note for the full rationale.
  */
-export function Screen({ children, contentClassName = '', showHistoryLink = false, wide = false, side }: ScreenProps) {
+export function Screen({ children, contentClassName = '', showHistoryLink = false, wide = false, side, ambience }: ScreenProps) {
+  const [blobA, blobB] = AMBIENCE_BLOBS[ambience ?? 'default']
   return (
     <div className="relative min-h-[100dvh] overflow-hidden bg-grain bg-ink-900">
       {/* Ambient glow — only becomes visually meaningful once there's room for it (lg+). */}
       <div className="ambient-backdrop hidden lg:block" aria-hidden="true">
-        <div className="absolute -left-40 top-1/4 h-[32rem] w-[32rem] rounded-full bg-ember-600/10 blur-[120px]" />
-        <div className="absolute -right-40 bottom-1/4 h-[36rem] w-[36rem] rounded-full bg-rose-600/10 blur-[130px]" />
+        <div className={`absolute -left-40 top-1/4 h-[32rem] w-[32rem] rounded-full blur-[120px] transition-colors duration-700 ${blobA}`} />
+        <div className={`absolute -right-40 bottom-1/4 h-[36rem] w-[36rem] rounded-full blur-[130px] transition-colors duration-700 ${blobB}`} />
       </div>
 
       <div className={`relative z-[1] mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-5 pb-8 pt-[max(1.5rem,env(safe-area-inset-top))] sm:max-w-lg sm:px-8 ${wide ? 'lg:max-w-5xl lg:px-12' : 'lg:max-w-2xl'}`}>

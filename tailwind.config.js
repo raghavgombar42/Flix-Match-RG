@@ -8,41 +8,57 @@ export default {
         sans: ['"Manrope"', 'system-ui', 'sans-serif'],
       },
       colors: {
+        // "Neo-Cinema Date Night" — violet-tinted midnight in place of the old warm
+        // brown/amber scale. Token *names* are unchanged on purpose (every component
+        // already references ink/ember/rose/sage/parchment) — only the values move,
+        // so the whole app reskins from this one file.
         ink: {
-          950: '#0D0A08',
-          900: '#120E0C',
-          800: '#1B1512',
-          700: '#251E19',
-          600: '#332922',
-          500: '#453830',
+          950: '#07060C',
+          900: '#0C0A16',
+          800: '#141122',
+          700: '#1D1830',
+          600: '#28213F',
+          500: '#332A4D',
         },
         ember: {
-          400: '#F4A65B',
-          500: '#EE8B3C',
-          600: '#D9722A',
-          700: '#B85A1E',
+          400: '#FFB25E',
+          500: '#F59E42',
+          600: '#DB7F26',
+          700: '#B8641A',
         },
         rose: {
-          400: '#E9707E',
-          500: '#DD4F62',
-          600: '#C63A4E',
+          400: '#FF8B7D',
+          500: '#FF6B5B',
+          600: '#E5493A',
         },
         sage: {
-          400: '#8FBFA0',
-          500: '#6FA684',
+          400: '#7FD4B0',
+          500: '#57B892',
         },
         parchment: {
-          100: '#FBF6EF',
-          200: '#F1E7D8',
-          300: '#E4D4BD',
+          100: '#F3F1FA',
+          200: '#E4DFF3',
+          300: '#CBC2E8',
+        },
+        // New accents for mood ambience and the premium reveal moments.
+        violet: {
+          400: '#B79CFB',
+          500: '#8B5CF6',
+          600: '#6D28D9',
+        },
+        electric: {
+          400: '#7CB3FF',
+          500: '#3B82F6',
+          600: '#1D4ED8',
         },
       },
       boxShadow: {
-        card: '0 20px 50px -15px rgba(0,0,0,0.6)',
-        glow: '0 0 0 1px rgba(244,166,91,0.25), 0 12px 30px -8px rgba(238,139,60,0.35)',
+        card: '0 20px 50px -15px rgba(0,0,0,0.7)',
+        glow: '0 0 0 1px rgba(255,178,94,0.25), 0 12px 30px -8px rgba(245,158,66,0.35)',
+        'glow-violet': '0 0 0 1px rgba(139,92,246,0.3), 0 12px 40px -8px rgba(139,92,246,0.45)',
       },
       backgroundImage: {
-        grain: "radial-gradient(circle at 20% 20%, rgba(244,166,91,0.08), transparent 40%), radial-gradient(circle at 80% 0%, rgba(221,79,98,0.08), transparent 45%)",
+        grain: "radial-gradient(circle at 15% 15%, rgba(139,92,246,0.14), transparent 40%), radial-gradient(circle at 85% 0%, rgba(255,107,91,0.10), transparent 45%), radial-gradient(circle at 50% 100%, rgba(59,130,246,0.08), transparent 50%)",
       },
       keyframes: {
         'fade-up': {
@@ -57,11 +73,22 @@ export default {
           '0%': { transform: 'scale(0.9)', opacity: '0.8' },
           '100%': { transform: 'scale(1.6)', opacity: '0' },
         },
+        'spotlight-sweep': {
+          '0%': { opacity: '0', transform: 'scale(0.85) rotate(-2deg)' },
+          '60%': { opacity: '1' },
+          '100%': { opacity: '0.9', transform: 'scale(1) rotate(0deg)' },
+        },
+        'glow-pulse': {
+          '0%, 100%': { opacity: '0.55' },
+          '50%': { opacity: '1' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both',
         shimmer: 'shimmer 2.5s linear infinite',
         'pulse-ring': 'pulse-ring 1.8s cubic-bezier(0.4,0,0.6,1) infinite',
+        'spotlight-sweep': 'spotlight-sweep 1.1s cubic-bezier(0.16, 1, 0.3, 1) both',
+        'glow-pulse': 'glow-pulse 2.4s ease-in-out infinite',
       },
     },
   },

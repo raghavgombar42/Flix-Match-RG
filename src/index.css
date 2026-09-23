@@ -9,7 +9,7 @@
 
   body {
     @apply bg-ink-900 text-parchment-100 font-sans antialiased;
-    background-image: var(--tw-gradient-stops), url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%25" height="100%25" filter="url(%23n)" opacity="0.025"/></svg>');
+    background-image: var(--tw-gradient-stops), url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%25" height="100%25" filter="url(%23n)" opacity="0.035"/></svg>');
     background-attachment: fixed;
   }
 
@@ -51,6 +51,21 @@
     inset: 0;
     z-index: 0;
     overflow: hidden;
+  }
+
+  /* Poster-mosaic backdrop: a blurred, dimmed grid of posters behind hero/reveal moments.
+     Purely decorative — content in front always carries its own solid background. */
+  .poster-mosaic {
+    position: absolute;
+    inset: -10%;
+    z-index: 0;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.5rem;
+    filter: blur(6px) saturate(1.1);
+    opacity: 0.35;
+    -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
   }
 }
 
